@@ -29,6 +29,13 @@ func main() {
 				if event.Has(fsnotify.Write) && strings.HasSuffix(event.Name, ".go") {
 					runTests()
 				}
+
+				dir := isDir(event.Name)
+
+				if dir && event.Has(fsnotify.Create) {
+					addWatcher(watcher, event.Name)
+				}
+
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -45,11 +52,13 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		if strings.HasPrefix(path, ".git") {
+			return nil
+		}
+
 		if d.IsDir() {
-			err := watcher.Add(path)
-			if err != nil {
-				log.Fatal(err)
-			}
+			addWatcher(watcher, path)
 		}
 		return nil
 	})
@@ -59,6 +68,22 @@ func main() {
 	}
 
 	<-make(chan struct{})
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+
+	return info.IsDir()
+}
+
+func addWatcher(watcher *fsnotify.Watcher, path string) {
+	err := watcher.Add(path)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func runTests() {
